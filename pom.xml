@@ -16,7 +16,7 @@
     <groupId>com.countryservice</groupId>
     <artifactId>country-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <packaging>jar</packaging>
+    <packaging>war</packaging>
     <name>country-service</name>
     <description>Micro-service country-service (Atelier Maven - Spring Boot)</description>
 
@@ -72,6 +72,13 @@
             <version>2.8.9</version>
         </dependency>
 
+        <!-- Tomcat provided by the external server when deployed as a war -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-tomcat</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Tests : JUnit 5, Mockito, MockMvc -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -81,6 +88,7 @@
     </dependencies>
 
     <build>
+        <finalName>country-service</finalName>   <!-- → target/country-service.war -->
         <plugins>
             <!-- Lombok must be declared as annotation processor (required since JDK 23) -->
             <plugin>
@@ -97,7 +105,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Builds the executable jar: target/country-service-0.0.1-SNAPSHOT.jar -->
+            <!-- Builds the executable war: target/country-service.war -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
