@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 
 // configure() is what Tomcat calls when the war is deployed
-public class ServletInitializerTests {
+class ServletInitializerTests {
 
 	static class TestableApplication extends CountryServiceApplication {
 		SpringApplicationBuilder callConfigure(SpringApplicationBuilder builder) {
@@ -15,7 +15,7 @@ public class ServletInitializerTests {
 	}
 
 	@Test
-	public void test_configure_registersApplicationSource() {
+	void test_configure_registersApplicationSource() {
 		SpringApplicationBuilder builder = new TestableApplication().callConfigure(new SpringApplicationBuilder());
 		assertNotNull(builder.build());
 	}
