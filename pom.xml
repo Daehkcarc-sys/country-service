@@ -24,7 +24,22 @@
         <java.version>17</java.version>
         <!-- Lombok recent enough to work with JDK 25 (your Eclipse runs on Java 25) -->
         <lombok.version>1.18.42</lombok.version>
+        <jacoco.version>0.8.13</jacoco.version>
+        <!-- Nexus Repository (runs in WSL on port 8083) -->
+        <nexus.url>http://localhost:8083</nexus.url>
     </properties>
+
+    <!-- mvn deploy uploads the war to Nexus (credentials come from ci/settings.xml) -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-releases</id>
+            <url>${nexus.url}/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshots</id>
+            <url>${nexus.url}/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <dependencies>
         <!-- Spring Data JPA -->
@@ -89,6 +104,16 @@
 
     <build>
         <finalName>country-service</finalName>   <!-- → target/country-service.war -->
+        <pluginManagement>
+            <plugins>
+                <!-- lets Jenkins run "mvn sonar:sonar" (SonarQube analysis) -->
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>5.7.0.6970</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <!-- Lombok must be declared as annotation processor (required since JDK 23) -->
             <plugin>
@@ -103,6 +128,28 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+
+            <!-- JaCoCo code coverage: report generated in target/site/jacoco/ after the tests -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Builds the executable war: target/country-service.war -->
