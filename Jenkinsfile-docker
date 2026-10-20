@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+    tools {
+        maven 'M2_HOME'
+    }
+    triggers {
+        githubPush()
+    }
+    environment {
+        DOCKERHUB_USER = 'daehkcarcx'
+        IMAGE = "${DOCKERHUB_USER}/country-service"
+    }
+    stages {
+        stage('Checkout code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Daehkcarc-sys/country-service.git'
+            }
+        }
+        stage('Build Maven Project') {
+            steps {
+                sh 'mvn clean package'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $IMAGE:$BUILD_NUMBER -t $IMAGE:latest .'
+            }
+        }
+        stage('Test Docker Image') {
+            steps {
+                // run the image (H2 profile, no MySQL in the container) and call the API
+                sh '''
+                    docker rm -f country-service-test || true
+                    docker run -d --name country-service-test -e SPRING_PROFILES_ACTIVE=default -p 8085:8082 $IMAGE:$BUILD_NUMBER
+                '''
+                retry(12) {
+                    sleep 5
+                    sh 'curl -sf http://localhost:8085/getcountries'
+                }
+            }
+            post {
+                always {
+                    sh 'docker rm -f country-service-test || true'
+                }
+            }
+        }
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
+                    sh '''
+                        echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
+                        docker push $IMAGE:$BUILD_NUMBER
+                        docker push $IMAGE:latest
+                    '''
+                }
+            }
+            post {
+                always {
+                    sh 'docker logout'
+                }
+            }
+        }
+    }
+}
