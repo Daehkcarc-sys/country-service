@@ -52,11 +52,14 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_TOKEN')]) {
-                    sh '''
-                        echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin
-                        docker push $IMAGE:$BUILD_NUMBER
-                        docker push $IMAGE:latest
-                    '''
+                    sh 'echo "$DH_TOKEN" | docker login -u "$DH_USER" --password-stdin'
+                    // slow uploads can time out on a layer; layers already pushed are skipped on retry
+                    retry(3) {
+                        sh '''
+                            docker push $IMAGE:$BUILD_NUMBER
+                            docker push $IMAGE:latest
+                        '''
+                    }
                 }
             }
             post {
