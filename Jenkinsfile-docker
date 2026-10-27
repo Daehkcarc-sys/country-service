@@ -68,7 +68,8 @@ pipeline {
         stage('Deploy to Kubernetes') {
             steps {
                 // kubeconfig-file: Secret file credential holding the docker-desktop kubeconfig
-                kubeconfig(credentialsId: 'kubeconfig-file', serverUrl: '') {
+                // withKubeConfig replaces the old kubeconfig step (which now requires caCertificate)
+                withKubeConfig(credentialsId: 'kubeconfig-file') {
                     sh '''
                         kubectl apply -f deployment.yaml
                         kubectl apply -f service.yaml
