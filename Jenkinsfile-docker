@@ -65,5 +65,27 @@ pipeline {
                 }
             }
         }
+        stage('Deploy to Kubernetes') {
+            steps {
+                // kubeconfig-file: Secret file credential holding the docker-desktop kubeconfig
+                kubeconfig(credentialsId: 'kubeconfig-file', serverUrl: '') {
+                    sh '''
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
+                        # deploy the image of this build (not :latest) so every build triggers a rollout
+                        kubectl set image deployment/my-country-service country-service-container=$IMAGE:$BUILD_NUMBER
+                        kubectl rollout status deployment/my-country-service --timeout=180s
+                    '''
+                }
+            }
+        }
+        stage('Check Kubernetes deployment') {
+            steps {
+                retry(12) {
+                    sleep 5
+                    sh 'curl -sf http://localhost:30007/getcountries'
+                }
+            }
+        }
     }
 }
