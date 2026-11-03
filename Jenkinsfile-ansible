@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+    tools {
+        maven 'M2_HOME'
+    }
+    triggers {
+        githubPush()
+    }
+    stages {
+        stage('Checkout code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Daehkcarc-sys/country-service.git'
+            }
+        }
+        stage('Build maven') {
+            steps {
+                sh 'mvn clean install'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        stage('Check Ansible playbook (dry run)') {
+            steps {
+                // kubeconfig-file: Secret file credential holding the docker-desktop kubeconfig
+                // ansible-vault-pass: Secret text credential that decrypts vault.yml (Docker Hub access)
+                withKubeConfig(credentialsId: 'kubeconfig-file') {
+                    // --check: simulate the playbook without changing anything
+                    ansiblePlaybook(installation: 'myansible', inventory: 'hosts', playbook: 'playbookCICD.yml',
+                            vaultCredentialsId: 'ansible-vault-pass', extras: '--check -e image_tag=$BUILD_NUMBER', colorized: true)
+                }
+            }
+        }
+        stage('Deploy using Ansible playbook') {
+            steps {
+                withKubeConfig(credentialsId: 'kubeconfig-file') {
+                    ansiblePlaybook(installation: 'myansible', inventory: 'hosts', playbook: 'playbookCICD.yml',
+                            vaultCredentialsId: 'ansible-vault-pass', extras: '-e image_tag=$BUILD_NUMBER', colorized: true)
+                }
+            }
+        }
+        stage('Check Kubernetes deployment') {
+            steps {
+                retry(12) {
+                    sleep 5
+                    sh 'curl -sf http://localhost:30008/getcountries'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            // Clean up or perform post-build actions
+            cleanWs()
+        }
+        success {
+            echo 'Ansible playbook executed successfully!'
+        }
+        failure {
+            echo 'Ansible playbook execution failed!'
+        }
+    }
+}
