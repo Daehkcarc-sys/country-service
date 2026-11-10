@@ -32,7 +32,10 @@ pipeline {
         }
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                // the SonarQube container cannot reach Jenkins (WSL) for the webhook callback:
+                // let the analysis finish, then waitForQualityGate reads the result straight from the Sonar API
+                sleep(time: 20, unit: 'SECONDS')
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
