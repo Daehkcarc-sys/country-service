@@ -1,0 +1,84 @@
+pipeline {
+    agent any
+    tools {
+        maven 'M2_HOME'
+    }
+    triggers {
+        githubPush()
+    }
+    stages {
+        stage('Checkout code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Daehkcarc-sys/country-service.git'
+            }
+        }
+        stage('Build and test (Maven, JUnit)') {
+            steps {
+                // compile + JUnit tests + JaCoCo report + war
+                sh 'mvn clean install'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                }
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv(installationName: 'MySonarQubeServer', credentialsId: 'sonarqubePWD') {
+                    sh 'mvn sonar:sonar -Dsonar.projectKey=country-service -Dsonar.projectName=country-service'
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('Deploy using Ansible playbook') {
+            steps {
+                // kubeconfig-file: Secret file credential holding the docker-desktop kubeconfig
+                // ansible-vault-pass: Secret text credential that decrypts vault.yml (Docker Hub access)
+                withKubeConfig(credentialsId: 'kubeconfig-file') {
+                    ansiblePlaybook(installation: 'myansible', inventory: 'hosts', playbook: 'playbookCICD.yml',
+                            vaultCredentialsId: 'ansible-vault-pass', extras: '-e image_tag=$BUILD_NUMBER', colorized: true)
+                }
+            }
+        }
+        stage('Check Kubernetes deployment') {
+            steps {
+                retry(12) {
+                    sleep 5
+                    sh 'curl -sf http://localhost:30008/getcountries'
+                }
+            }
+        }
+        stage('Monitoring: kube-state-metrics (Helm)') {
+            steps {
+                // pod state exporter scraped by Prometheus on NodePort 30080 (Grafana dashboard 13332)
+                withKubeConfig(credentialsId: 'kubeconfig-file') {
+                    sh '''
+                        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
+                        helm upgrade --install kube-state-metrics prometheus-community/kube-state-metrics \
+                            --kube-context docker-desktop --namespace monitoring --create-namespace \
+                            --set service.type=NodePort --set service.nodePort=30080 --wait --timeout 5m
+                    '''
+                }
+                sh 'curl -sf http://localhost:30080/metrics | grep -c "^kube_pod_status_phase"'
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline executed successfully: app deployed and monitored (Prometheus + Grafana)'
+        }
+        failure {
+            echo 'Pipeline execution failed!'
+        }
+    }
+}
