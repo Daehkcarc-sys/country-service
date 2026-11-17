@@ -132,9 +132,9 @@ A green run means:
 
 ## 8. Per-pod metrics (CPU / memory) for Prometheus
 
-Prometheus reads pod CPU and memory from the kubelet with a read-only account:
+Prometheus reads pod CPU and memory from the kubelet with a read-only account. Run this in WSL as root, from your clone:
 ```bash
-export KUBECONFIG=/home/<your wsl user>/.kube/config     # Docker Desktop writes it there
+export KUBECONFIG=/mnt/c/Users/<your windows user>/kubeconfig-docker-desktop   # the file created in step 5
 kubectl --context docker-desktop apply -f monitoring/prometheus-scraper-rbac.yaml
 kubectl --context docker-desktop -n monitoring get secret prometheus-scraper-token -o jsonpath='{.data.token}'  | base64 -d > /etc/prometheus/k8s-token
 kubectl --context docker-desktop -n monitoring get secret prometheus-scraper-token -o jsonpath='{.data.ca\.crt}' | base64 -d > /etc/prometheus/k8s-ca.crt
